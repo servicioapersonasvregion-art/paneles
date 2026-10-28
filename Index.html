@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Información de Paneles RRHH</title>
+<meta name="theme-color" content="#d6001c">
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--tx:#1b2433;--mu:#667085;--pr:#d6001c;--ok:#12805c;--wa:#b7791f;--bd:#e1e5ee}
+@media(prefers-color-scheme:dark){:root{--bg:#12161d;--card:#1c222d;--tx:#eef1f6;--mu:#97a1b3;--bd:#2c3442}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--pr);color:#fff;padding:14px 16px;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:8px}
+header small{font-weight:400;opacity:.9;white-space:nowrap}
+main{max-width:520px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:12px}
+h2{margin:0 0 8px;font-size:18px}p{margin:6px 0;color:var(--mu)}
+select,textarea,input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font:inherit}
+textarea{min-height:110px;resize:vertical}
+button{font:inherit;border:0;border-radius:10px;padding:13px 16px;font-weight:600;cursor:pointer;width:100%;background:var(--pr);color:#fff;margin-top:10px}
+button.sec{background:transparent;color:var(--tx);border:1px solid var(--bd)}button:disabled{opacity:.45}
+.mod{display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer}.mod.off{opacity:.6;cursor:default}
+.tag{font-size:12px;padding:3px 9px;border-radius:99px;background:var(--bd);color:var(--mu);white-space:nowrap}.tag.ok{background:var(--ok);color:#fff}
+.block{text-align:center;padding:28px 16px}.block .ic{font-size:44px}
+.prev{width:100%;max-height:300px;object-fit:cover;border-radius:10px;margin-top:8px}
+.bar{height:10px;background:var(--bd);border-radius:9px;overflow:hidden;margin:8px 0}.bar i{display:block;height:100%;background:var(--ok)}
+.err{color:var(--pr);font-size:14px;margin-top:6px}
+.banner{background:var(--ok);color:#fff;border-radius:14px;padding:14px;margin-bottom:12px;font-weight:600}
+label.ph{display:block;border:2px dashed var(--bd);border-radius:10px;padding:14px;text-align:center;color:var(--mu);cursor:pointer;margin-top:8px}
+.row{display:flex;justify-content:space-between;padding:10px 2px;border-top:1px solid var(--bd);cursor:pointer;font-size:15px}
+.gal{padding:8px 0;border-bottom:1px dashed var(--bd)}.gal b{font-size:13px}.gal p{margin:2px 0 6px;font-size:13px;color:var(--tx)}
+.load{text-align:center;color:var(--mu);padding:30px}
+table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;color:var(--mu)}td{padding:6px 4px;border-top:1px solid var(--bd)}
+a{color:var(--pr)}
+</style></head><body>
+<header><span>📋 Información de Paneles RRHH</span><small id="cnt"></small></header>
+<main id="app"><div class="load">Cargando…</div></main>
+<script>
+const LOCALES=["1 NORTE","4 PONIENTE","JARDIN DEL MAR","ETCHEVERS","LA FORESTA","PINARES MONTEMAR","QUILLOTA 1","QUILLOTA 21 MAYO","LIMACHE","OLMUE","VILLA ALEMANA 1","VILLA ALEMANA 2","PUCHUNCAVI","QUINTERO 1","QUINTERO 2","MARGA MARGA","LA LIGUA","CURAUMA","VALPARAISO PUERTO"];
+const MODS=[["uv","PANEL RAYOS UV","☀️","d"],["tj","PANEL TODOS JUGAMOS","🎯","m"],["hr","PANEL HORARIOS","🕐","m"],["co","PANEL COMUNICACIONES","📣","m"],["da","PANEL DIAS ACCIDENTES","🦺","d"]];
+const DN=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const app=document.getElementById('app'),$=id=>document.getElementById(id);
+let local=null,est=null,cur=null,photo=null,busy=false,pin=null,adm=null,open=null;
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// ▼▼▼ PEGA AQUÍ el link de tu Apps Script (el que termina en /exec) ▼▼▼
+const API="PEGA_AQUI_TU_LINK_EXEC por tu link /exec";
+// ▲▲▲
+async function run(fn,...args){
+  if(!/^https:\/\/script\.google\.com\/.+\/exec$/.test(API))throw new Error("Falta configurar el link de la API.");
+  let r;
+  try{r=await fetch(API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({fn,args})});}
+  catch(e){throw new Error("Sin conexión. Revisa tu internet e intenta de nuevo.");}
+  let j;try{j=await r.json();}catch(e){throw new Error("El servidor no respondió correctamente. Intenta de nuevo.");}
+  if(!j.ok)throw new Error(j.error||"Error desconocido.");
+  return j.data;
+}
+const msg=e=>(e&&e.message?e.message:String(e)).replace(/^Exception:\s*/,'');
+const dmy=f=>f.split('-').reverse().join('-');
+const loading=t=>app.innerHTML=`<div class="load">${t||'Cargando…'}</div>`;
+
+function setCnt(c){$('cnt').textContent=c.req.length?c.contador+" / 19 enviados":"Hoy sin reporte diario";}
+async function tick(){if(document.hidden||busy)return;try{const c=await run('getContador');setCnt(c);if(est&&!cur&&!pin&&c.hoy!==est.hoy){est=await run('getEstado',local);render();}}catch(e){}}
+
+function render(){
+  if(pin)return adminView();
+  if(!local)return home();
+  const pendM=['tj','hr','co'].filter(k=>!est.mensuales[k]);
+  if(est.completo&&!pendM.length)return blocked();
+  if(cur)return modulo(cur);
+  return panel();
+}
+function home(){
+  app.innerHTML=`<div class="card"><h2>Selecciona tu local</h2><p>Elige tu local para comenzar el reporte de hoy.</p>
+  <select id="sel"><option value="">— Elegir local —</option>${LOCALES.map(l=>`<option>${l}</option>`).join('')}</select>
+  <button id="go">Continuar</button><div class="err" id="e"></div></div>
+  <div class="card" id="admBox"><button class="sec" id="ad" style="margin-top:0">🔐 Administrador</button></div>`;
+  $('go').onclick=async()=>{const v=$('sel').value;if(!v)return $('e').textContent="Debes seleccionar un local.";
+    loading();try{est=await run('getEstado',v);local=v;setCnt(est);render();}catch(e){home();$('e').textContent=msg(e);}};
+  $('ad').onclick=()=>{$('admBox').innerHTML=`<label><b>Clave de administrador</b></label><input type="password" id="pw" autocomplete="off"><button id="pwb">Entrar</button><div class="err" id="pe"></div>`;
+    $('pw').focus();const go=async()=>{const x=$('pw').value;if(!x)return;$('pwb').disabled=true;
+      try{adm=await run('admin',x,null);pin=x;open=null;render();}catch(e){$('pe').textContent=msg(e);$('pwb').disabled=false;}};
+    $('pwb').onclick=go;$('pw').onkeydown=e=>{if(e.key==='Enter')go();};};
+}
+function salir(){local=null;est=null;cur=null;photo=null;render();}
+function blocked(){
+  app.innerHTML=`<div class="card block"><div class="ic">🔒</div><h2>Este local ya envió su reporte de hoy</h2><p>${esc(local)} completó el reporte. Gracias.</p><button class="sec" id="bk">Volver al inicio</button></div>`;
+  $('bk').onclick=salir;
+}
+function panel(){
+  const rq=est.req,d=est.diarios,n=rq.filter(k=>d[k]).length,dn=DN[est.dow];
+  const card=([k,t,i,ty])=>{let tag,ok=false,click=false;
+    if(ty==='d'){if(rq.includes(k)){ok=!!d[k];tag=ok?'✓ Enviado':'Pendiente';click=!ok;}else tag='No corresponde hoy';}
+    else{ok=!!est.mensuales[k];tag=ok?'✓ Enviado este mes':'Mensual · pendiente';click=!ok;}
+    return `<div class="card mod ${click?'':'off'}" ${click?`data-k="${k}"`:''}><b>${i} ${t}</b><span class="tag ${ok?'ok':''}">${tag}</span></div>`};
+  const txt=est.completo?`<b>Este local ya envió su reporte de hoy.</b> Aún puedes enviar los paneles mensuales pendientes.`
+    :rq.length?`Hoy (${dn}) debes enviar Rayos UV y Días Accidentes. Tu local cuenta como reportado al enviar ambos (${n}/2).`
+    :`Hoy (${dn}) no hay paneles diarios. Puedes enviar los paneles mensuales pendientes.`;
+  app.innerHTML=`<div class="card"><h2>${esc(local)}</h2><p>${txt}</p>${rq.length?`<div class="bar"><i style="width:${n*50}%"></i></div>`:''}</div>
+  ${MODS.map(card).join('')}<button class="sec" id="bk">← Cambiar de local</button>`;
+  app.querySelectorAll('[data-k]').forEach(el=>el.onclick=()=>{cur=el.dataset.k;photo=null;render();});
+  $('bk').onclick=salir;
+}
+function modulo(k){
+  const [,t,i]=MODS.find(x=>x[0]===k);
+  app.innerHTML=`<div class="card"><h2>${i} ${t}</h2><p>${esc(local)} · ${dmy(est.hoy)}</p>
+  <label><b>Observaciones</b> (opcional)</label><textarea id="obs" maxlength="2000" placeholder="Escribe tus observaciones..."></textarea>
+  <label class="ph" for="ph">📷 Tomar o subir 1 foto (opcional)</label>
+  <input id="ph" type="file" accept="image/*" hidden><img id="pv" class="prev" hidden>
+  <div class="err" id="e"></div><button id="send">Enviar</button><button class="sec" id="bk">← Volver a los paneles</button></div>`;
+  $('ph').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{photo=await shrink(f);$('pv').src=photo;$('pv').hidden=false;}catch(x){$('e').textContent="No se pudo leer la foto.";}};
+  $('send').onclick=()=>enviar(k);
+  $('bk').onclick=()=>{cur=null;photo=null;render();};
+}
+function shrink(f){return new Promise((r,j)=>{const im=new Image();im.onerror=j;im.onload=()=>{const s=Math.min(1,1000/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext('2d').drawImage(im,0,0,c.width,c.height);let q=.7,d=c.toDataURL('image/jpeg',q);while(d.length>250000&&q>.3){q-=.1;d=c.toDataURL('image/jpeg',q)}r(d)};im.src=URL.createObjectURL(f)})}
+async function enviar(k){
+  if(busy)return;busy=true;const b=$('send');b.disabled=true;b.textContent="Enviando...";
+  try{est=await run('enviar',local,k,$('obs').value.trim(),photo);photo=null;cur=null;busy=false;setCnt(est);render();}
+  catch(e){busy=false;b.disabled=false;b.textContent="Enviar";$('e').textContent=msg(e)||"No se pudo enviar. Intenta de nuevo.";
+    if(/ya fue enviado|no corresponde/.test(msg(e))){try{est=await run('getEstado',local);}catch(x){}}}
+}
+
+// ===== ADMIN =====
+function adminView(){
+  const a=adm,n=a.contador;
+  app.innerHTML=`${a.req&&n>=19?`<div class="banner">🎉 ¡Los 19 locales ya reportaron! Puedes descargar el Excel consolidado.</div>`:''}
+  <div class="card"><h2>Panel de administrador</h2><label>Fecha</label><input type="date" id="dt" value="${a.fecha}" max="${a.hoy}">
+  <p>${a.req?`Locales que reportaron: <b>${n} / 19</b>`:'Esa fecha no es día de reporte diario (lun, mié, vie).'}</p><div class="bar"><i style="width:${n/19*100}%"></i></div>
+  ${a.locales.map(x=>`<div class="row" data-i="${x.i}"><span>${x.completo?'✅':(x.parcial?'🟡':'⏳')} ${x.local}</span><span class="tag">ver fotos</span></div><div id="g${x.i}"></div>`).join('')}
+  <p style="font-size:13px">✅ completo · 🟡 envió 1 de 2 · ⏳ sin envío</p>
+  <button id="xl">⬇️ Descargar Excel consolidado</button><div class="err" id="xe"></div>
+  <p style="font-size:13px;margin-top:10px"><a href="${esc(a.url)}" target="_blank">Abrir planilla completa en Google Sheets</a></p>
+  <button class="sec" id="rf">↻ Actualizar</button><button class="sec" id="bk">← Salir</button></div>
+  <div class="card"><h2>Paneles mensuales (${a.ym})</h2><div style="overflow-x:auto"><table><tr><th>Local</th><th>Jugamos</th><th>Horarios</th><th>Comunic.</th></tr>
+  ${a.locales.map(x=>`<tr><td>${x.local}</td>${['tj','hr','co'].map(k=>`<td>${x.mensuales[k]?'✅':'⏳'}</td>`).join('')}</tr>`).join('')}</table></div></div>`;
+  $('dt').onchange=e=>cargarAdm(e.target.value);
+  $('rf').onclick=()=>cargarAdm(a.fecha);
+  $('bk').onclick=()=>{pin=null;adm=null;open=null;render();};
+  app.querySelectorAll('.row').forEach(el=>el.onclick=()=>galeria(+el.dataset.i));
+  $('xl').onclick=excel;
+}
+async function cargarAdm(f){loading();try{adm=await run('admin',pin,f);open=null;}catch(e){alert(msg(e));}adminView();}
+async function galeria(i){
+  const box=$('g'+i);if(open===i){box.innerHTML='';open=null;return;}
+  if(open!==null&&$('g'+open))$('g'+open).innerHTML='';
+  open=i;box.innerHTML='<p>Cargando…</p>';
+  try{const r=await run('adminDetalle',pin,adm.fecha,LOCALES[i]);if(open!==i)return;
+    box.innerHTML=r.length?r.map(m=>`<div class="gal"><b>${esc(m.titulo)}</b> <span class="tag">${m.tipo==='m'?'Mensual · '+dmy(m.fecha):'Diario'} ${esc(m.hora)}</span><p>${esc(m.obs)||'<i>Sin observaciones</i>'}</p>${m.img?`<img class="prev" src="${m.img}">`:''}</div>`).join(''):'<p>Sin envíos en esta fecha.</p>';
+  }catch(e){box.innerHTML=`<p class="err">${esc(msg(e))}</p>`;}
+}
+function xlsxLib(){return window.XLSX?Promise.resolve():new Promise((ok,ko)=>{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';sc.onload=ok;sc.onerror=ko;document.head.appendChild(sc);});}
+async function excel(){
+  const b=$('xl');b.disabled=true;b.textContent="Generando...";
+  try{const [rows]=await Promise.all([run('adminExcel',pin,adm.fecha),xlsxLib()]);
+    const wb=XLSX.utils.book_new(),ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=Object.keys(rows[0]).map(()=>({wch:22}));
+    XLSX.utils.book_append_sheet(wb,ws,"Consolidado");XLSX.writeFile(wb,"Reporte_Locales_"+adm.fecha+".xlsx");
+  }catch(e){$('xe').textContent="No se pudo descargar aquí. Usa el link 'Abrir planilla completa'. ("+msg(e)+")";}
+  b.disabled=false;b.textContent="⬇️ Descargar Excel consolidado";
+}
+
+render();tick();setInterval(tick,30000);
+</script></body></html>
